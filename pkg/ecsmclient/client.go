@@ -68,7 +68,7 @@ func (c *LogClient) Apply(ctx context.Context, op Operation) error {
 	case "need_start":
 		return c.startByID(ctx, op)
 	case "need_stop":
-		return c.requireActualAndAction(ctx, op, "stop")
+		return c.stopByID(ctx, op)
 	case "need_scale_out", "need_scale_in":
 		return c.scaleByID(ctx, op)
 	default:
@@ -141,13 +141,6 @@ func (c *LogClient) createService(ctx context.Context, op Operation) error {
 	return nil
 }
 
-func (c *LogClient) requireActualAndAction(ctx context.Context, op Operation, action string) error {
-	if op.Actual == nil || op.Actual.ID == "" {
-		return fmt.Errorf("actual service id is required for %s: service=%s", action, op.ServiceName)
-	}
-	return c.actionByID(ctx, op.Actual.ID, action)
-}
-
 func (c *LogClient) startByID(ctx context.Context, op Operation) error {
 	if op.Actual == nil || op.Actual.ID == "" {
 		return fmt.Errorf("actual service id is required for start: service=%s", op.ServiceName)
@@ -164,6 +157,24 @@ func (c *LogClient) startByID(ctx context.Context, op Operation) error {
 		}
 	}
 	return c.actionByID(ctx, serviceID, "start")
+}
+
+func (c *LogClient) stopByID(ctx context.Context, op Operation) error {
+	if op.Actual == nil || op.Actual.ID == "" {
+		return fmt.Errorf("actual service id is required for stop: service=%s", op.ServiceName)
+	}
+
+	serviceID := op.Actual.ID
+	if replicasDiffer(op) {
+		updatedID, err := c.updateReplicasByID(ctx, op)
+		if err != nil {
+			return err
+		}
+		if updatedID != "" {
+			serviceID = updatedID
+		}
+	}
+	return c.actionByID(ctx, serviceID, "stop")
 }
 
 func (c *LogClient) actionByID(ctx context.Context, serviceID, action string) error {
@@ -252,7 +263,11 @@ func replicasDiffer(op Operation) bool {
 	if op.Actual.Factor > 0 {
 		return op.Actual.Factor != op.Desired.Replicas
 	}
-	return op.Actual.InstanceActive != op.Desired.Replicas
+	return actualReplicaCount(*op.Actual) != op.Desired.Replicas
+}
+
+func actualReplicaCount(actual ServiceInfo) int {
+	return actual.InstanceOnline + actual.InstanceActive
 }
 
 func isActualRunning(actual ServiceInfo) bool {

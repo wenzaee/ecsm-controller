@@ -13,16 +13,18 @@ import (
 	"github.com/wenzaee/ecsm-controller/pkg/config"
 )
 
-const servicePath = "/api/v1/service"
+const (
+	servicePath            = "/api/v1/service"
+	firstServicePageNum    = 1
+	defaultServicePageSize = 50
+)
 
 // Config 是 ECSM 实际状态采集配置。
 type Config struct {
-	Scheme   string
-	IP       string
-	Port     int
-	PageNum  int
-	PageSize int
-	Timeout  time.Duration
+	Scheme  string
+	IP      string
+	Port    int
+	Timeout time.Duration
 }
 
 // Collector 负责从 ECSM HTTP API 采集服务实际运行状态。
@@ -53,18 +55,50 @@ func NewCollector(cfg Config) (*Collector, error) {
 func NewCollectorFromConfig(cfg config.ECSMConfig) (*Collector, error) {
 	timeout := time.Duration(cfg.TimeoutSeconds) * time.Second
 	return NewCollector(Config{
-		Scheme:   cfg.Scheme,
-		IP:       cfg.IP,
-		Port:     cfg.Port,
-		PageNum:  cfg.PageNum,
-		PageSize: cfg.PageSize,
-		Timeout:  timeout,
+		Scheme:  cfg.Scheme,
+		IP:      cfg.IP,
+		Port:    cfg.Port,
+		Timeout: timeout,
 	})
 }
 
-// CollectServices 采集 ECSM 当前服务实际状态列表。
+// CollectServices 采集 ECSM 当前服务实际状态列表，会自动分页拉取完整列表。
 func (c *Collector) CollectServices(ctx context.Context) (*ServicePage, error) {
-	endpoint := c.serviceURL()
+	var all []ServiceInfo
+	total := 0
+
+	for pageNum := firstServicePageNum; ; pageNum++ {
+		page, err := c.collectServicePage(ctx, pageNum, defaultServicePageSize)
+		if err != nil {
+			return nil, err
+		}
+
+		if total == 0 && page.Total > 0 {
+			total = page.Total
+		}
+		all = append(all, page.List...)
+
+		if len(page.List) < defaultServicePageSize {
+			break
+		}
+		if total > 0 && len(all) >= total {
+			break
+		}
+	}
+
+	if total == 0 {
+		total = len(all)
+	}
+	return &ServicePage{
+		List:     all,
+		Total:    total,
+		PageSize: defaultServicePageSize,
+		PageNum:  firstServicePageNum,
+	}, nil
+}
+
+func (c *Collector) collectServicePage(ctx context.Context, pageNum, pageSize int) (*ServicePage, error) {
+	endpoint := c.serviceURL(pageNum, pageSize)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
 	if err != nil {
 		return nil, err
@@ -90,15 +124,15 @@ func (c *Collector) CollectServices(ctx context.Context) (*ServicePage, error) {
 	return &apiResp.Data, nil
 }
 
-func (c *Collector) serviceURL() string {
+func (c *Collector) serviceURL(pageNum, pageSize int) string {
 	u := url.URL{
 		Scheme: c.cfg.Scheme,
 		Host:   net.JoinHostPort(c.cfg.IP, strconv.Itoa(c.cfg.Port)),
 		Path:   servicePath,
 	}
 	values := u.Query()
-	values.Set("pageNum", strconv.Itoa(c.cfg.PageNum))
-	values.Set("pageSize", strconv.Itoa(c.cfg.PageSize))
+	values.Set("pageNum", strconv.Itoa(pageNum))
+	values.Set("pageSize", strconv.Itoa(pageSize))
 	u.RawQuery = values.Encode()
 	return u.String()
 }
@@ -106,12 +140,6 @@ func (c *Collector) serviceURL() string {
 func normalizeConfig(cfg Config) Config {
 	if cfg.Scheme == "" {
 		cfg.Scheme = "http"
-	}
-	if cfg.PageNum <= 0 {
-		cfg.PageNum = 1
-	}
-	if cfg.PageSize <= 0 {
-		cfg.PageSize = 50
 	}
 	if cfg.Timeout <= 0 {
 		cfg.Timeout = 5 * time.Second

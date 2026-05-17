@@ -39,8 +39,6 @@ type ECSMConfig struct {
 	Scheme         string `json:"scheme" yaml:"scheme"`
 	IP             string `json:"ip" yaml:"ip"`
 	Port           int    `json:"port" yaml:"port"`
-	PageNum        int    `json:"page_num" yaml:"page_num"`
-	PageSize       int    `json:"page_size" yaml:"page_size"`
 	TimeoutSeconds int    `json:"timeout_seconds" yaml:"timeout_seconds"`
 }
 

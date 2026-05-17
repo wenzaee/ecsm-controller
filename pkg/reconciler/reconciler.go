@@ -140,16 +140,17 @@ func CompareDesiredActual(desired *registry.DesiredState, actual ecsmclient.Serv
 		if !found {
 			return DiffNeedCreate
 		}
+		actualReplicas := actualReplicaCount(actual)
 		if desired.Replicas <= 0 {
 			if !isActualRunning(actual) {
 				return DiffNeedStart
 			}
 			return DiffNone
 		}
-		if actual.InstanceActive < desired.Replicas {
+		if actualReplicas < desired.Replicas {
 			return DiffNeedScaleOut
 		}
-		if actual.InstanceActive > desired.Replicas {
+		if actualReplicas > desired.Replicas {
 			return DiffNeedScaleIn
 		}
 		if !isActualRunning(actual) {
@@ -157,13 +158,27 @@ func CompareDesiredActual(desired *registry.DesiredState, actual ecsmclient.Serv
 		}
 		return DiffNone
 	case registry.DesiredActionStop:
-		if found && isActualRunning(actual) {
+		if !found {
+			return DiffNone
+		}
+		actualReplicas := actualReplicaCount(actual)
+		if desired.Replicas > 0 && actualReplicas < desired.Replicas {
+			return DiffNeedScaleOut
+		}
+		if desired.Replicas > 0 && actualReplicas > desired.Replicas {
+			return DiffNeedScaleIn
+		}
+		if isActualRunning(actual) {
 			return DiffNeedStop
 		}
 		return DiffNone
 	default:
 		return DiffNone
 	}
+}
+
+func actualReplicaCount(actual ecsmclient.ServiceInfo) int {
+	return actual.InstanceOnline + actual.InstanceActive
 }
 
 func isActualRunning(actual ecsmclient.ServiceInfo) bool {
