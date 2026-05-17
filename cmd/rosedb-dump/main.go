@@ -10,7 +10,7 @@ import (
 	"os"
 	"strings"
 
-	"ecsm/pkg/config"
+	"github.com/wenzaee/ecsm-controller/pkg/config"
 
 	"github.com/rosedblabs/rosedb/v2"
 )

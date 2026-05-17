@@ -9,9 +9,9 @@ import (
 	"strings"
 	"time"
 
-	"ecsm/pkg/config"
-	"ecsm/pkg/desiredclient"
-	desiredvsoa "ecsm/pkg/vsoa"
+	"github.com/wenzaee/ecsm-controller/pkg/config"
+	"github.com/wenzaee/ecsm-controller/pkg/desiredclient"
+	desiredvsoa "github.com/wenzaee/ecsm-controller/pkg/vsoa"
 )
 
 func main() {

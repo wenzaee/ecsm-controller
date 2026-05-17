@@ -1,6 +1,6 @@
 package vsoa
 
-import "ecsm/pkg/registry"
+import "github.com/wenzaee/ecsm-controller/pkg/registry"
 
 const (
 	// RouteHealthz 是 desired state VSOA 服务的健康检查接口。

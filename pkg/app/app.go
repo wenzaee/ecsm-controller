@@ -7,14 +7,14 @@ import (
 	"sync"
 	"time"
 
-	"ecsm/pkg/config"
-	"ecsm/pkg/desiredwatcher"
-	"ecsm/pkg/ecsmclient"
-	"ecsm/pkg/queue"
-	"ecsm/pkg/reconciler"
-	"ecsm/pkg/registry"
-	"ecsm/pkg/scanner"
-	desiredvsoa "ecsm/pkg/vsoa"
+	"github.com/wenzaee/ecsm-controller/pkg/config"
+	"github.com/wenzaee/ecsm-controller/pkg/desiredwatcher"
+	"github.com/wenzaee/ecsm-controller/pkg/ecsmclient"
+	"github.com/wenzaee/ecsm-controller/pkg/queue"
+	"github.com/wenzaee/ecsm-controller/pkg/reconciler"
+	"github.com/wenzaee/ecsm-controller/pkg/registry"
+	"github.com/wenzaee/ecsm-controller/pkg/scanner"
+	desiredvsoa "github.com/wenzaee/ecsm-controller/pkg/vsoa"
 )
 
 // App 是工程入口组装后的运行实例。

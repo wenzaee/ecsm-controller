@@ -7,9 +7,9 @@ import (
 	"log"
 	"strings"
 
-	"ecsm/pkg/ecsmclient"
-	"ecsm/pkg/queue"
-	"ecsm/pkg/registry"
+	"github.com/wenzaee/ecsm-controller/pkg/ecsmclient"
+	"github.com/wenzaee/ecsm-controller/pkg/queue"
+	"github.com/wenzaee/ecsm-controller/pkg/registry"
 )
 
 // DiffAction 表示 desired state 和 actual state 比对后的内部收敛动作。

@@ -8,8 +8,8 @@ import (
 	"os/signal"
 	"syscall"
 
-	"ecsm/pkg/app"
-	"ecsm/pkg/config"
+	"github.com/wenzaee/ecsm-controller/pkg/app"
+	"github.com/wenzaee/ecsm-controller/pkg/config"
 )
 
 func main() {

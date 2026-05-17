@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"ecsm/pkg/registry"
-	desiredvsoa "ecsm/pkg/vsoa"
+	"github.com/wenzaee/ecsm-controller/pkg/registry"
+	desiredvsoa "github.com/wenzaee/ecsm-controller/pkg/vsoa"
 
 	vsoaclient "github.com/acoinfo/vsoa/client"
 	"github.com/acoinfo/vsoa/protocol"

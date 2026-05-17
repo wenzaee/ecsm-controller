@@ -13,7 +13,7 @@ import (
 	"strconv"
 	"strings"
 
-	"ecsm/pkg/registry"
+	"github.com/wenzaee/ecsm-controller/pkg/registry"
 )
 
 // Client 抽象 Reconciler 需要的 ECSM 能力：

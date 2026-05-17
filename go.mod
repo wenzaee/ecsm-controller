@@ -1,4 +1,4 @@
-module ecsm
+module github.com/wenzaee/ecsm-controller
 
 go 1.24.5
 

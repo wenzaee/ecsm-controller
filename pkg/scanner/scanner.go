@@ -6,10 +6,10 @@ import (
 	"log"
 	"time"
 
-	"ecsm/pkg/ecsmclient"
-	"ecsm/pkg/queue"
-	"ecsm/pkg/reconciler"
-	"ecsm/pkg/registry"
+	"github.com/wenzaee/ecsm-controller/pkg/ecsmclient"
+	"github.com/wenzaee/ecsm-controller/pkg/queue"
+	"github.com/wenzaee/ecsm-controller/pkg/reconciler"
+	"github.com/wenzaee/ecsm-controller/pkg/registry"
 )
 
 const defaultInterval = 30 * time.Second

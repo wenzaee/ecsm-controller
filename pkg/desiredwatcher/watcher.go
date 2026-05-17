@@ -4,8 +4,8 @@ import (
 	"context"
 	"log"
 
-	"ecsm/pkg/queue"
-	"ecsm/pkg/registry"
+	"github.com/wenzaee/ecsm-controller/pkg/queue"
+	"github.com/wenzaee/ecsm-controller/pkg/registry"
 )
 
 // Watcher 只监听 desired state 变更，并把 serviceName 放入工作队列。

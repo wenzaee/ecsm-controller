@@ -6,7 +6,7 @@ import (
 	"errors"
 	"fmt"
 
-	"ecsm/pkg/registry"
+	"github.com/wenzaee/ecsm-controller/pkg/registry"
 )
 
 // DesiredStateStore 是 VSOA 层依赖的最小存储接口。

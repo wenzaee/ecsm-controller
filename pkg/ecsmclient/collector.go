@@ -10,7 +10,7 @@ import (
 	"strconv"
 	"time"
 
-	"ecsm/pkg/config"
+	"github.com/wenzaee/ecsm-controller/pkg/config"
 )
 
 const servicePath = "/api/v1/service"
