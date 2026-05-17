@@ -1,0 +1,20 @@
+registry:
+  rosedb:
+    dir_path: /tmp/ecsm-controller-demo
+    sync: false
+    watch_queue_size: 1024
+
+vsoa:
+  listen_addr: ":13447"
+  password: ""
+
+ecsm:
+  scheme: http
+  ip: 192.168.50.82
+  port: 3001
+  page_num: 1
+  page_size: 50
+  timeout_seconds: 5
+
+scanner:
+  interval_seconds: 30
