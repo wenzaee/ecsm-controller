@@ -267,7 +267,7 @@ func replicasDiffer(op Operation) bool {
 }
 
 func actualReplicaCount(actual ServiceInfo) int {
-	return actual.InstanceOnline + actual.InstanceActive
+	return actual.InstanceActive
 }
 
 func isActualRunning(actual ServiceInfo) bool {

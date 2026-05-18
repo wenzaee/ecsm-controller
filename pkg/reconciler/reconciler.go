@@ -178,7 +178,7 @@ func CompareDesiredActual(desired *registry.DesiredState, actual ecsmclient.Serv
 }
 
 func actualReplicaCount(actual ecsmclient.ServiceInfo) int {
-	return actual.InstanceOnline + actual.InstanceActive
+	return actual.InstanceActive
 }
 
 func isActualRunning(actual ecsmclient.ServiceInfo) bool {
