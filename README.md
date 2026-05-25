@@ -203,7 +203,9 @@ go run ./cmd/desired-vsoa-client \
   -desired-action start \
   -replicas 3
 ```
-
+```bash
+./desired-vsoa-client -action update  -service c_worker_2@1.1.0 -desired-action start  -replicas 3
+```
 或：
 
 ```bash

@@ -16,7 +16,7 @@ import (
 
 func main() {
 	configPath := flag.String("config", "configs/demo.yaml", "YAML config file path")
-	addr := flag.String("addr", "", "VSOA server address")
+	addr := flag.String("addr", "192.168.50.82:13447", "VSOA server address")
 	password := flag.String("password", "", "VSOA password")
 	action := flag.String("action", "healthz", "action: healthz, update, query, delete, list")
 	serviceName := flag.String("service", "", "service name")
@@ -25,6 +25,11 @@ func main() {
 	payload := flag.String("payload", "", "raw JSON request payload")
 	timeout := flag.Duration("timeout", 5*time.Second, "request timeout")
 	flag.Parse()
+
+	actionName := strings.ToLower(strings.TrimSpace(*action))
+	if !isSupportedAction(actionName) {
+		log.Fatalf("不支持的 action: %s", *action)
+	}
 
 	cfg, err := config.Load(*configPath)
 	if err != nil {
@@ -51,7 +56,7 @@ func main() {
 	defer cancel()
 
 	var resp any
-	switch strings.ToLower(strings.TrimSpace(*action)) {
+	switch actionName {
 	case "healthz":
 		resp, err = c.Healthz(ctx)
 	case "update":
@@ -66,8 +71,6 @@ func main() {
 		resp, err = c.DeleteDesired(ctx, *serviceName)
 	case "list":
 		resp, err = c.ListDesired(ctx)
-	default:
-		log.Fatalf("不支持的 action: %s", *action)
 	}
 	if err != nil {
 		log.Fatalf("调用 VSOA 失败: %v", err)
@@ -90,6 +93,15 @@ func buildUpdateRequest(rawPayload, serviceName, action string, replicas int) (d
 	}
 
 	return desiredclient.NewUpdateRequest(strings.TrimSpace(serviceName), desiredclient.Action(strings.TrimSpace(action)), replicas)
+}
+
+func isSupportedAction(action string) bool {
+	switch action {
+	case "healthz", "update", "query", "delete", "list":
+		return true
+	default:
+		return false
+	}
 }
 
 func printJSON(value any) {

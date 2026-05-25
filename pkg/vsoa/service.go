@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/wenzaee/ecsm-controller/pkg/registry"
 )
@@ -41,13 +42,9 @@ func (s *DesiredStateService) HandleUpdateDesiredPayload(ctx context.Context, pa
 	if err := decodePayload(payload, &req); err != nil {
 		return errorResponse(err)
 	}
-	if req.Replicas == nil {
-		return errorResponse(fmt.Errorf("replicas is required"))
-	}
-	state := registry.DesiredState{
-		ServiceName: req.ServiceName,
-		Action:      req.Action,
-		Replicas:    *req.Replicas,
+	state, err := desiredStateFromUpdateRequest(req)
+	if err != nil {
+		return errorResponse(err)
 	}
 	if err := s.store.UpdateDesired(ctx, state); err != nil {
 		return errorResponse(err)
@@ -97,6 +94,25 @@ func decodePayload(payload []byte, out any) error {
 		return fmt.Errorf("decode request payload: %w", err)
 	}
 	return nil
+}
+
+func desiredStateFromUpdateRequest(req UpdateDesiredRequest) (registry.DesiredState, error) {
+	serviceName := strings.TrimSpace(req.ServiceName)
+	if serviceName == "" {
+		return registry.DesiredState{}, fmt.Errorf("service name is required")
+	}
+	if req.Replicas == nil {
+		return registry.DesiredState{}, fmt.Errorf("replicas is required")
+	}
+	state := registry.DesiredState{
+		ServiceName: serviceName,
+		Action:      req.Action,
+		Replicas:    *req.Replicas,
+	}
+	if err := registry.ValidateDesiredState(state); err != nil {
+		return registry.DesiredState{}, err
+	}
+	return state, nil
 }
 
 func errorResponse(err error) RPCResponse {

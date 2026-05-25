@@ -3,7 +3,6 @@ package desiredclient
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -115,9 +114,6 @@ func (c *Client) UpdateDesired(ctx context.Context, serviceName string, action A
 
 // UpdateDesiredRequest 使用完整请求修改指定服务的期望状态。
 func (c *Client) UpdateDesiredRequest(ctx context.Context, req UpdateRequest) (*Response, error) {
-	if req.Replicas == nil {
-		return nil, fmt.Errorf("replicas is required")
-	}
 	var resp desiredvsoa.RPCResponse
 	if err := c.call(ctx, desiredvsoa.RouteUpdateDesired, protocol.RpcMethodSet, req, &resp); err != nil {
 		return nil, err
@@ -167,17 +163,6 @@ func (c *Client) ListDesired(ctx context.Context) (*DesiredListResponse, error) 
 // NewUpdateRequest 构造修改期望状态的请求。
 func NewUpdateRequest(serviceName string, action Action, replicas int) (UpdateRequest, error) {
 	serviceName = strings.TrimSpace(serviceName)
-	if serviceName == "" {
-		return desiredvsoa.UpdateDesiredRequest{}, fmt.Errorf("service name is required")
-	}
-	switch action {
-	case registry.DesiredActionStart, registry.DesiredActionStop:
-	default:
-		return desiredvsoa.UpdateDesiredRequest{}, registry.ErrInvalidDesiredAction
-	}
-	if replicas < 0 {
-		return desiredvsoa.UpdateDesiredRequest{}, registry.ErrInvalidReplicas
-	}
 	return desiredvsoa.UpdateDesiredRequest{
 		ServiceName: serviceName,
 		Action:      action,
@@ -221,11 +206,6 @@ func (c *Client) call(ctx context.Context, path string, method protocol.RpcMessa
 		}
 		if out == nil || got.reply == nil || len(got.reply.Param) == 0 {
 			return nil
-		}
-
-		var rpcErr desiredvsoa.RPCResponse
-		if err := json.Unmarshal(got.reply.Param, &rpcErr); err == nil && rpcErr.Error != "" && !rpcErr.OK {
-			return errors.New(rpcErr.Error)
 		}
 
 		if err := json.Unmarshal(got.reply.Param, out); err != nil {

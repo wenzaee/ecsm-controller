@@ -256,6 +256,11 @@ func toEventAction(action rosedb.WatchActionType) EventAction {
 	return EventActionPut
 }
 
+// ValidateDesiredState 校验 desired state 是否符合存储和 VSOA API 约定。
+func ValidateDesiredState(state DesiredState) error {
+	return validateDesiredState(state)
+}
+
 func validateDesiredState(state DesiredState) error {
 	if err := validateServiceName(state.ServiceName); err != nil {
 		return err

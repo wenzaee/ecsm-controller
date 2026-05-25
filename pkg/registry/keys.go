@@ -31,6 +31,11 @@ func ServiceNameFromStatusKey(key string) (string, bool) {
 	return name, ok && name != ""
 }
 
+// ValidateServiceName 校验服务名是否符合 desired state API 约定。
+func ValidateServiceName(serviceName string) error {
+	return validateServiceName(serviceName)
+}
+
 func validateServiceName(serviceName string) error {
 	serviceName = strings.TrimSpace(serviceName)
 	name, tag, ok := strings.Cut(serviceName, "@")
