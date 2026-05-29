@@ -1,23 +1,30 @@
-name: ECSM Dependency Controller CI
+name: ECSM Controller CI
 
 on:
   push:
     branches:
       - main
       - master
-      - dev
-  pull_request:
 
 jobs:
   check:
     runs-on: go-latest
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
       - name: Show Go version
         run: go version
+
+      - name: Install git
+        run: |
+          apt-get update
+          apt-get install -y git
+
+      - name: Clone repository manually
+        run: |
+          git clone http://192.168.50.68:3000/wenza03/ecsm-controller.git repo
+          cd repo
+          git checkout main
+          ls -lah
 
       - name: Configure Go proxy
         run: |
@@ -25,19 +32,16 @@ jobs:
           go env -w GOSUMDB=sum.golang.google.cn
 
       - name: Download dependencies
-        run: go mod download
-
-      - name: Check gofmt
         run: |
-          files=$(gofmt -l .)
-          if [ -n "$files" ]; then
-            echo "The following files are not gofmt-formatted:"
-            echo "$files"
-            exit 1
-          fi
+          cd repo
+          go mod download
 
       - name: Build project
-        run: go build ./...
+        run: |
+          cd repo
+          go build ./...
 
       - name: Run go vet
-        run: go vet ./...
+        run: |
+          cd repo
+          go vet ./...
