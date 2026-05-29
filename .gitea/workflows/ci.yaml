@@ -1,0 +1,43 @@
+name: ECSM Dependency Controller CI
+
+on:
+  push:
+    branches:
+      - main
+      - master
+      - dev
+  pull_request:
+
+jobs:
+  check:
+    runs-on: go-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Show Go version
+        run: go version
+
+      - name: Configure Go proxy
+        run: |
+          go env -w GOPROXY=https://goproxy.cn,direct
+          go env -w GOSUMDB=sum.golang.google.cn
+
+      - name: Download dependencies
+        run: go mod download
+
+      - name: Check gofmt
+        run: |
+          files=$(gofmt -l .)
+          if [ -n "$files" ]; then
+            echo "The following files are not gofmt-formatted:"
+            echo "$files"
+            exit 1
+          fi
+
+      - name: Build project
+        run: go build ./...
+
+      - name: Run go vet
+        run: go vet ./...
