@@ -73,7 +73,13 @@ go run ./cmd/desired-vsoa-client \
   -desired-action start \
   -replicas 3
 ```
-
+```bash
+go run ./cmd/desired-vsoa-client \
+  -action update \
+  -service fault_repair@1.0.0 \
+  -desired-action start \
+  -replicas 3
+```
 编译成可执行文件后：
 
 ```bash
@@ -232,7 +238,7 @@ go run ./cmd/desired-vsoa-client \
 ```bash
 go run ./cmd/desired-vsoa-client \
   -action delete \
-  -service c_worker_3@1.1.0
+  -service fault_repair@1.1.0
 ```
 
 编译成可执行文件后：

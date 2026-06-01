@@ -27,10 +27,11 @@ type ActualReader interface {
 // Scanner 定时扫描 RoseDB 中的 desired state，并和 ECSM 实际状态做比对。
 // 发现不一致时只将 serviceName 放入工作队列，真正收敛由 reconciler worker 统一完成。
 type Scanner struct {
-	desired  DesiredLister
-	actual   ActualReader
-	queue    *queue.WorkQueue
-	interval time.Duration
+	desired        DesiredLister
+	actual         ActualReader
+	queue          *queue.WorkQueue
+	interval       time.Duration
+	lastActualPage *ecsmclient.ServicePage
 }
 
 // New 创建定时扫描器。
@@ -82,9 +83,9 @@ func (s *Scanner) ScanOnce(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("list desired states: %w", err)
 	}
-	page, err := s.actual.CollectServices(ctx)
+	page, err := s.collectActualServices(ctx)
 	if err != nil {
-		return fmt.Errorf("collect actual services: %w", err)
+		return err
 	}
 
 	log.Printf("[INFO] scanner 开始比对: desired=%d actual=%d", len(desiredList), len(page.List))
@@ -108,6 +109,20 @@ func (s *Scanner) ScanOnce(ctx context.Context) error {
 		s.queue.Add(desired.ServiceName)
 	}
 	return nil
+}
+
+func (s *Scanner) collectActualServices(ctx context.Context) (*ecsmclient.ServicePage, error) {
+	page, err := s.actual.CollectServices(ctx)
+	if err == nil {
+		s.lastActualPage = page
+		return page, nil
+	}
+	if s.lastActualPage == nil {
+		return nil, fmt.Errorf("collect actual services: %w", err)
+	}
+
+	log.Printf("[WARN] scanner 获取 ECSM 实际状态失败，使用上一次结果继续比对: %v", err)
+	return s.lastActualPage, nil
 }
 
 func (s *Scanner) scanAndLog(ctx context.Context) {
