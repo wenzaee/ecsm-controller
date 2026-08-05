@@ -31,3 +31,16 @@ func TestLoadWithoutPathReturnsDefault(t *testing.T) {
 		t.Fatalf("Load(\"\") = %+v, want default %+v", cfg, Default())
 	}
 }
+
+func TestLoadReturnsUsefulErrors(t *testing.T) {
+	if _, err := Load(filepath.Join(t.TempDir(), "missing.yaml")); err == nil {
+		t.Fatal("Load() unexpectedly accepted missing file")
+	}
+	path := filepath.Join(t.TempDir(), "broken.yaml")
+	if err := os.WriteFile(path, []byte("ecsm: ["), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Load(path); err == nil {
+		t.Fatal("Load() unexpectedly accepted invalid YAML")
+	}
+}

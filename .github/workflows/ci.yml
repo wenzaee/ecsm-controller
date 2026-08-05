@@ -12,6 +12,8 @@ jobs:
     name: Backend tests and report
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    env:
+      COVERAGE_THRESHOLD: "80"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
@@ -41,6 +43,30 @@ jobs:
             --exit-code "${{ steps.tests.outputs.exit_code }}" \
             --output artifacts/test-summary.md
           cat artifacts/test-summary.md >> "$GITHUB_STEP_SUMMARY"
+      - name: Check coverage threshold
+        id: coverage
+        if: always()
+        shell: bash
+        run: |
+          coverage=""
+          if [ -f artifacts/coverage.txt ]; then
+            coverage=$(awk '/^total:/ { gsub("%", "", $3); print $3 }' artifacts/coverage.txt)
+          fi
+
+          if [ -n "$coverage" ] && awk "BEGIN { exit !($coverage >= $COVERAGE_THRESHOLD) }"; then
+            echo "passed=true" >> "$GITHUB_OUTPUT"
+            {
+              echo "## 覆盖率质量门槛 ✅"
+              echo "当前语句覆盖率为 **${coverage}%**，达到 **${COVERAGE_THRESHOLD}%** 的最低要求。"
+            } >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "passed=false" >> "$GITHUB_OUTPUT"
+            {
+              echo "## 覆盖率质量门槛 ❌"
+              echo "当前语句覆盖率为 **${coverage:-未生成}%**，低于 **${COVERAGE_THRESHOLD}%** 的最低要求。"
+              echo "请补充未覆盖的业务分支与异常路径测试后重新提交。"
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
       - name: Upload test report
         if: always()
         uses: actions/upload-artifact@v4
@@ -52,7 +78,13 @@ jobs:
       - name: Mark workflow failed when tests fail
         if: always()
         shell: bash
-        run: exit "${{ steps.tests.outputs.exit_code }}"
+        run: |
+          if [ "${{ steps.tests.outputs.exit_code }}" != "0" ]; then
+            exit "${{ steps.tests.outputs.exit_code }}"
+          fi
+          if [ "${{ steps.coverage.outputs.passed }}" != "true" ]; then
+            exit 1
+          fi
 
   build-package:
     name: Compile and package
