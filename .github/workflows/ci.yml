@@ -19,23 +19,28 @@ jobs:
           go-version-file: go.mod
           cache: true
       - name: Run unit tests and collect raw report
+        id: tests
         shell: bash
         run: |
-          set -o pipefail
+          set +e
           mkdir -p artifacts
           go test -json -coverprofile=artifacts/coverage.out ./... | tee artifacts/test-results.json
+          test_exit_code=${PIPESTATUS[0]}
+          echo "exit_code=$test_exit_code" >> "$GITHUB_OUTPUT"
+          exit 0
       - name: Create coverage reports
-        if: success()
+        if: always()
         run: |
-          go tool cover -func=artifacts/coverage.out | tee artifacts/coverage.txt
-          go tool cover -html=artifacts/coverage.out -o artifacts/coverage.html
-          {
-            echo "## Backend test report"
-            echo '```text'
-            cat artifacts/coverage.txt
-            echo '```'
-            echo "Detailed JSON test events and the HTML coverage report are attached to this workflow run."
-          } >> "$GITHUB_STEP_SUMMARY"
+          if [ -f artifacts/coverage.out ]; then
+            go tool cover -func=artifacts/coverage.out | tee artifacts/coverage.txt
+            go tool cover -html=artifacts/coverage.out -o artifacts/coverage.html
+          fi
+          go run ./tools/testsummary \
+            --input artifacts/test-results.json \
+            --coverage artifacts/coverage.txt \
+            --exit-code "${{ steps.tests.outputs.exit_code }}" \
+            --output artifacts/test-summary.md
+          cat artifacts/test-summary.md >> "$GITHUB_STEP_SUMMARY"
       - name: Upload test report
         if: always()
         uses: actions/upload-artifact@v4
@@ -44,6 +49,10 @@ jobs:
           path: artifacts/
           if-no-files-found: warn
           retention-days: 14
+      - name: Mark workflow failed when tests fail
+        if: always()
+        shell: bash
+        run: exit "${{ steps.tests.outputs.exit_code }}"
 
   build-package:
     name: Compile and package
