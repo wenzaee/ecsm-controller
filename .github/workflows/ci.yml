@@ -1,0 +1,72 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  backend-test:
+    name: Backend tests and report
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Run unit tests and collect raw report
+        shell: bash
+        run: |
+          set -o pipefail
+          mkdir -p artifacts
+          go test -json -coverprofile=artifacts/coverage.out ./... | tee artifacts/test-results.json
+      - name: Create coverage reports
+        if: success()
+        run: |
+          go tool cover -func=artifacts/coverage.out | tee artifacts/coverage.txt
+          go tool cover -html=artifacts/coverage.out -o artifacts/coverage.html
+          {
+            echo "## Backend test report"
+            echo '```text'
+            cat artifacts/coverage.txt
+            echo '```'
+            echo "Detailed JSON test events and the HTML coverage report are attached to this workflow run."
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-test-report
+          path: artifacts/
+          if-no-files-found: warn
+          retention-days: 14
+
+  build-package:
+    name: Compile and package
+    needs: backend-test
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Compile binaries
+        run: make build
+      - name: Package binaries
+        shell: bash
+        run: |
+          mkdir -p artifacts
+          tar -czf artifacts/ecsm-controller-linux-amd64.tar.gz -C bin .
+          sha256sum artifacts/ecsm-controller-linux-amd64.tar.gz > artifacts/SHA256SUMS
+      - name: Upload package
+        uses: actions/upload-artifact@v4
+        with:
+          name: ecsm-controller-linux-amd64
+          path: artifacts/
+          retention-days: 14

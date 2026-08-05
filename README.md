@@ -182,6 +182,27 @@ bin/desired-vsoa-client
 bin/rosedb-dump
 ```
 
+### 测试与持续集成
+
+本地执行全部后端单元测试：
+
+```bash
+make test
+```
+
+生成覆盖率报告（输出到 `artifacts/coverage.html`）：
+
+```bash
+make coverage
+```
+
+推送任意分支或创建 Pull Request 后，GitHub Actions 会自动执行：
+
+1. `backend-test`：独立后台测试任务，执行所有单元测试并生成 JSON 测试事件、覆盖率文本和 HTML 覆盖率报告；结果可从工作流的 `backend-test-report` 构件下载。
+2. `build-package`：仅在测试通过后编译三个命令行程序，打包为 `ecsm-controller-linux-amd64.tar.gz`，并上传校验和与安装包构件。
+
+工作流定义位于 `.github/workflows/ci.yml`，因此开发流程为：本地开发和 `make test` → Git 提交/推送 → GitHub CI 自动测试 → 通过后自动编译、打包并保存报告与产物。
+
 ### 启动控制器
 
 ```bash
@@ -313,4 +334,3 @@ scanner:
 - Reconciler 在真正执行前总是重新读取最新 desired state，避免使用过期事件。
 
 这种模式可以降低外部系统和 ECSM 操作细节之间的耦合，也让服务状态具备持续自修正能力。
-
