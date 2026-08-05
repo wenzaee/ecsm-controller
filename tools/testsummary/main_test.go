@@ -14,6 +14,7 @@ func TestBuildReportIncludesMetricsAndCoverage(t *testing.T) {
 	events := strings.Join([]string{
 		`{"Action":"run","Package":"example/pkg","Test":"TestPass"}`,
 		`{"Action":"pass","Package":"example/pkg","Test":"TestPass","Elapsed":0.01}`,
+		`{"Action":"start","Package":"example/no-tests"}`,
 	}, "\n")
 	if err := os.WriteFile(input, []byte(events), 0o600); err != nil {
 		t.Fatal(err)
@@ -26,7 +27,7 @@ func TestBuildReportIncludesMetricsAndCoverage(t *testing.T) {
 	if err != nil {
 		t.Fatalf("buildReport() error = %v", err)
 	}
-	for _, want := range []string{"Status:** Passed", "| Passed | 1 |", "| Statement coverage | 82.5% |", "`TestPass`"} {
+	for _, want := range []string{"执行结论：通过", "| 通过 | 1 |", "| 语句覆盖率 | 82.5% |", "`TestPass`", "尚未包含自动化用例的代码包"} {
 		if !strings.Contains(report, want) {
 			t.Errorf("report does not contain %q:\n%s", want, report)
 		}
@@ -43,7 +44,7 @@ func TestBuildReportMarksNonZeroTestExitCodeAsFailure(t *testing.T) {
 	if err != nil {
 		t.Fatalf("buildReport() error = %v", err)
 	}
-	if !strings.Contains(report, "Status:** Failed") || !strings.Contains(report, "| Test command exit code | `1` |") {
+	if !strings.Contains(report, "执行结论：失败") || !strings.Contains(report, "| 测试命令退出码 | `1` |") {
 		t.Fatalf("expected failed report, got:\n%s", report)
 	}
 }
