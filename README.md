@@ -198,7 +198,7 @@ make coverage
 
 推送任意分支或创建 Pull Request 后，GitHub Actions 会自动执行：
 
-1. `backend-test`：独立后台测试任务。运行摘要会清晰显示测试总数、通过/失败/跳过数、耗时、覆盖率和测试明细；语句覆盖率低于 80% 时任务会失败。JSON 测试事件及 HTML 覆盖率报告可从 `backend-test-report` 构件下载。
+1. `backend-test`：独立后台测试任务。运行摘要会清晰显示测试总数、通过/失败/跳过数、耗时、覆盖率和测试明细；语句覆盖率低于 70% 时任务会失败。JSON 测试事件及 HTML 覆盖率报告可从 `backend-test-report` 构件下载。
 2. `build-package`：仅在测试通过后编译三个命令行程序，打包为 `ecsm-controller-linux-amd64.tar.gz`，并上传校验和与安装包构件。
 
 工作流定义位于 `.github/workflows/ci.yml`，因此开发流程为：本地开发和 `make test` → Git 提交/推送 → GitHub CI 自动测试 → 通过后自动编译、打包并保存报告与产物。

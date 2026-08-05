@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"testing"
+
+	"github.com/rosedblabs/rosedb/v2"
 )
 
 func newTestStore(t *testing.T, watchQueueSize uint64) *RoseDBStore {
@@ -22,6 +24,10 @@ func TestDesiredAndStatusPersistence(t *testing.T) {
 	desired := DesiredState{ServiceName: "worker@1.0.0", Action: DesiredActionStart, Replicas: 2}
 	if err := store.PutDesired(ctx, desired); err != nil {
 		t.Fatalf("PutDesired() error = %v", err)
+	}
+	desired.Replicas = 3
+	if err := store.UpdateDesired(ctx, desired); err != nil {
+		t.Fatalf("UpdateDesired() error = %v", err)
 	}
 	gotDesired, err := store.QueryDesired(ctx, desired.ServiceName)
 	if err != nil || *gotDesired != desired {
@@ -78,6 +84,12 @@ func TestRegistryValidationAndKeyParsing(t *testing.T) {
 	}
 	if _, ok := ServiceNameFromStatusKey("desired/services/api@2.0.0"); ok {
 		t.Fatal("ServiceNameFromStatusKey() accepted desired key")
+	}
+	if err := ValidateServiceName("api@2.0.0"); err != nil {
+		t.Fatalf("ValidateServiceName() error = %v", err)
+	}
+	if toEventAction(rosedb.WatchActionDelete) != EventActionDelete || toEventAction(rosedb.WatchActionPut) != EventActionPut {
+		t.Fatal("toEventAction() returned unexpected values")
 	}
 }
 

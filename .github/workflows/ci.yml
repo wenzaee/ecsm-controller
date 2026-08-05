@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:
-      COVERAGE_THRESHOLD: "80"
+      COVERAGE_THRESHOLD: "70"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5

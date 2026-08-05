@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/acoinfo/vsoa/protocol"
 	"github.com/wenzaee/ecsm-controller/pkg/registry"
@@ -207,5 +208,20 @@ func TestServerRunStartsRoutesAndStopsOnCancellation(t *testing.T) {
 	}
 	if server.Errors() == nil {
 		t.Fatal("Errors() returned nil channel")
+	}
+}
+
+func TestServerStartIsIdempotent(t *testing.T) {
+	service, _ := NewDesiredStateService(&memoryStore{})
+	server, _ := NewServer("127.0.0.1:0", "", service)
+	if err := server.Start(); err != nil {
+		t.Fatalf("Start() error = %v", err)
+	}
+	if err := server.Start(); err != nil {
+		t.Fatalf("second Start() error = %v", err)
+	}
+	time.Sleep(10 * time.Millisecond)
+	if err := server.Close(); err != nil {
+		t.Fatalf("Close() error = %v", err)
 	}
 }
