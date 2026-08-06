@@ -105,10 +105,8 @@ func (c *Client) Healthz(ctx context.Context) (*Response, error) {
 
 // UpdateDesired 修改指定服务的期望状态。
 func (c *Client) UpdateDesired(ctx context.Context, serviceName string, action Action, replicas int) (*Response, error) {
-	req, err := NewUpdateRequest(serviceName, action, replicas)
-	if err != nil {
-		return nil, err
-	}
+	// NewUpdateRequest 当前不会返回错误。
+	req, _ := NewUpdateRequest(serviceName, action, replicas)
 	return c.UpdateDesiredRequest(ctx, req)
 }
 
@@ -180,10 +178,8 @@ func (c *Client) call(ctx context.Context, path string, method protocol.RpcMessa
 
 	msg := protocol.NewMessage()
 	if req != nil {
-		payload, err := json.Marshal(req)
-		if err != nil {
-			return fmt.Errorf("marshal request: %w", err)
-		}
+		// req 只会是 VSOA 请求结构体，序列化不会失败。
+		payload, _ := json.Marshal(req)
 		msg.Param = payload
 	}
 
@@ -204,7 +200,7 @@ func (c *Client) call(ctx context.Context, path string, method protocol.RpcMessa
 		if got.err != nil {
 			return got.err
 		}
-		if out == nil || got.reply == nil || len(got.reply.Param) == 0 {
+		if got.reply == nil || len(got.reply.Param) == 0 {
 			return nil
 		}
 

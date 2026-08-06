@@ -6,6 +6,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"strings"
@@ -29,39 +30,49 @@ type result struct {
 	Value   any       `json:"value,omitempty"`
 }
 
+// osExit 便于测试拦截进程退出。
+var osExit = os.Exit
+
 func main() {
-	configPath := flag.String("config", "configs/demo.yaml", "YAML config file path")
-	dirPath := flag.String("dir", "", "RoseDB data dir, overrides config registry.rosedb.dir_path")
-	action := flag.String("action", "list", "action: list, get, put, delete, clear")
-	key := flag.String("key", "", "key for get, put, delete")
-	value := flag.String("value", "", "value for put")
-	valueFile := flag.String("value-file", "", "file path to read value for put")
-	prefix := flag.String("prefix", "", "only list or clear keys with this prefix")
-	raw := flag.Bool("raw", false, "print raw value strings instead of decoding JSON values")
-	yes := flag.Bool("yes", false, "confirm destructive clear action")
-	flag.Parse()
+	osExit(runCLI(os.Args[1:], os.Stdout))
+}
+
+// runCLI 执行 RoseDB dump 命令行流程，返回进程退出码。
+func runCLI(args []string, out io.Writer) int {
+	flags := flag.NewFlagSet("rosedb-dump", flag.ContinueOnError)
+	configPath := flags.String("config", "configs/demo.yaml", "YAML config file path")
+	dirPath := flags.String("dir", "", "RoseDB data dir, overrides config registry.rosedb.dir_path")
+	action := flags.String("action", "list", "action: list, get, put, delete, clear")
+	key := flags.String("key", "", "key for get, put, delete")
+	value := flags.String("value", "", "value for put")
+	valueFile := flags.String("value-file", "", "file path to read value for put")
+	prefix := flags.String("prefix", "", "only list or clear keys with this prefix")
+	raw := flags.Bool("raw", false, "print raw value strings instead of decoding JSON values")
+	yes := flags.Bool("yes", false, "confirm destructive clear action")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
 
 	cfg, err := config.Load(*configPath)
 	if err != nil {
-		log.Fatalf("读取配置失败: %v", err)
+		log.Printf("读取配置失败: %v", err)
+		return 1
 	}
 
 	dbDir := firstNonEmpty(*dirPath, cfg.Registry.RoseDB.DirPath)
 	if dbDir == "" {
-		log.Fatal("RoseDB dir is required, set -dir or registry.rosedb.dir_path")
+		log.Print("RoseDB dir is required, set -dir or registry.rosedb.dir_path")
+		return 1
 	}
 
 	opts := rosedb.DefaultOptions
 	opts.DirPath = dbDir
 	db, err := rosedb.Open(opts)
 	if err != nil {
-		log.Fatalf("打开 RoseDB 失败: %v", err)
+		log.Printf("打开 RoseDB 失败: %v", err)
+		return 1
 	}
-	defer func() {
-		if err := db.Close(); err != nil {
-			log.Printf("关闭 RoseDB 失败: %v", err)
-		}
-	}()
+	defer func() { _ = db.Close() }()
 
 	got, err := run(db, options{
 		action:    strings.ToLower(strings.TrimSpace(*action)),
@@ -73,9 +84,14 @@ func main() {
 		yes:       *yes,
 	})
 	if err != nil {
-		log.Fatal(err)
+		log.Print(err)
+		return 1
 	}
-	printJSON(got)
+	if err := printJSON(out, got); err != nil {
+		log.Printf("JSON 编码失败: %v", err)
+		return 1
+	}
+	return 0
 }
 
 type options struct {
@@ -163,12 +179,24 @@ func clearEntries(db *rosedb.DB, opts options) (result, error) {
 	}
 
 	entries := listEntries(db, opts.prefix, true)
+	keys := make([]string, 0, len(entries))
 	for _, entry := range entries {
-		if err := db.Delete([]byte(entry.Key)); err != nil {
-			return result{}, fmt.Errorf("delete key %s: %w", entry.Key, err)
-		}
+		keys = append(keys, entry.Key)
+	}
+	if err := deleteKeys(db, keys); err != nil {
+		return result{}, err
 	}
 	return result{OK: true, Message: "clear success", Count: len(entries)}, nil
+}
+
+// deleteKeys 逐个删除 key，便于测试注入删除失败场景。
+var deleteKeys = func(db *rosedb.DB, keys []string) error {
+	for _, key := range keys {
+		if err := db.Delete([]byte(key)); err != nil {
+			return fmt.Errorf("delete key %s: %w", key, err)
+		}
+	}
+	return nil
 }
 
 func readValue(value string, valueFile string) ([]byte, error) {
@@ -199,12 +227,13 @@ func decodeValue(value []byte, raw bool) any {
 	return decoded
 }
 
-func printJSON(value any) {
+func printJSON(out io.Writer, value any) error {
 	payload, err := json.MarshalIndent(value, "", "  ")
 	if err != nil {
-		log.Fatalf("JSON 编码失败: %v", err)
+		return err
 	}
-	fmt.Println(string(payload))
+	_, err = fmt.Fprintln(out, string(payload))
+	return err
 }
 
 func firstNonEmpty(values ...string) string {

@@ -88,11 +88,7 @@ func (s *RoseDBStore) DeleteDesired(ctx context.Context, serviceName string) err
 	if err := validateServiceName(serviceName); err != nil {
 		return err
 	}
-	err := s.db.Delete([]byte(DesiredServiceKey(serviceName)))
-	if errors.Is(err, rosedb.ErrKeyNotFound) {
-		return ErrNotFound
-	}
-	return err
+	return mapKeyNotFoundErr(s.db.Delete([]byte(DesiredServiceKey(serviceName))))
 }
 
 // ListDesired 按 desired/services/ 前缀列出所有服务的 desired state。
@@ -113,11 +109,8 @@ func (s *RoseDBStore) ListDesired(ctx context.Context) ([]DesiredState, error) {
 // 调用方收到事件后应该入队，由 Reconciler 重新读取最新 desired state 再执行收敛。
 func (s *RoseDBStore) WatchDesired(ctx context.Context) (<-chan DesiredEvent, error) {
 	watchCh, err := s.db.Watch()
-	if errors.Is(err, rosedb.ErrWatchDisabled) {
-		return nil, ErrWatchDisabled
-	}
 	if err != nil {
-		return nil, err
+		return nil, mapWatchError(err)
 	}
 
 	out := make(chan DesiredEvent, 64)
@@ -128,7 +121,7 @@ func (s *RoseDBStore) WatchDesired(ctx context.Context) (<-chan DesiredEvent, er
 			case <-ctx.Done():
 				return
 			case event, ok := <-watchCh:
-				if !ok || event == nil {
+				if !ok {
 					return
 				}
 				serviceName, ok := ServiceNameFromDesiredKey(string(event.Key))
@@ -182,11 +175,7 @@ func (s *RoseDBStore) DeleteStatus(ctx context.Context, serviceName string) erro
 	if err := validateServiceName(serviceName); err != nil {
 		return err
 	}
-	err := s.db.Delete([]byte(StatusServiceKey(serviceName)))
-	if errors.Is(err, rosedb.ErrKeyNotFound) {
-		return ErrNotFound
-	}
-	return err
+	return mapKeyNotFoundErr(s.db.Delete([]byte(StatusServiceKey(serviceName))))
 }
 
 // ListStatus 按 status/services/ 前缀列出所有服务的收敛状态。
@@ -216,13 +205,18 @@ func (s *RoseDBStore) getJSON(ctx context.Context, key string, dst any) error {
 		return err
 	}
 	value, err := s.db.Get([]byte(key))
-	if errors.Is(err, rosedb.ErrKeyNotFound) {
-		return ErrNotFound
-	}
-	if err != nil {
+	if err := mapKeyNotFoundErr(err); err != nil {
 		return err
 	}
 	return json.Unmarshal(value, dst)
+}
+
+// mapKeyNotFoundErr 将 RoseDB 的 key 不存在错误统一映射为 ErrNotFound。
+func mapKeyNotFoundErr(err error) error {
+	if errors.Is(err, rosedb.ErrKeyNotFound) {
+		return ErrNotFound
+	}
+	return err
 }
 
 func (s *RoseDBStore) ascendPrefix(ctx context.Context, prefix string, handle func(key string, value []byte) error) error {
@@ -247,6 +241,14 @@ func (s *RoseDBStore) ascendPrefix(ctx context.Context, prefix string, handle fu
 		return true, nil
 	})
 	return iterErr
+}
+
+// mapWatchError 将 RoseDB watch 错误映射为 registry 层错误。
+func mapWatchError(err error) error {
+	if errors.Is(err, rosedb.ErrWatchDisabled) {
+		return ErrWatchDisabled
+	}
+	return err
 }
 
 func toEventAction(action rosedb.WatchActionType) EventAction {

@@ -12,6 +12,9 @@ import (
 	vsoaServer "github.com/acoinfo/vsoa/server"
 )
 
+// newVSOAServer 是创建底层 VSOA server 的函数，便于测试注入。
+var newVSOAServer = vsoaServer.NewServer
+
 // Server 把 desired state 存储能力通过 VSOA RPC 暴露出去。
 type Server struct {
 	addr     string
@@ -49,7 +52,7 @@ func (s *Server) Start() error {
 		return nil
 	}
 
-	srv := vsoaServer.NewServer("ecsm desired state vsoa server", vsoaServer.Option{
+	srv := newVSOAServer("ecsm desired state vsoa server", vsoaServer.Option{
 		Password: s.password,
 	})
 	if err := s.registerRoutes(srv); err != nil {

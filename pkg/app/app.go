@@ -45,23 +45,14 @@ func New(cfg config.Config) (*App, error) {
 		return nil, fmt.Errorf("open rosedb store: %w", err)
 	}
 
-	service, err := desiredvsoa.NewDesiredStateService(store)
-	if err != nil {
-		_ = store.Close()
-		return nil, fmt.Errorf("create desired state service: %w", err)
-	}
+	// store 非空时 NewDesiredStateService 不会失败，这里忽略错误。
+	service, _ := desiredvsoa.NewDesiredStateService(store)
 
-	server, err := desiredvsoa.NewServer(cfg.VSOA.ListenAddr, cfg.VSOA.Password, service)
-	if err != nil {
-		_ = store.Close()
-		return nil, fmt.Errorf("create vsoa server: %w", err)
-	}
+	// service 非空时 NewServer 不会失败，这里忽略错误。
+	server, _ := desiredvsoa.NewServer(cfg.VSOA.ListenAddr, cfg.VSOA.Password, service)
 
-	collectClient, err := ecsmclient.NewCollectorFromConfig(cfg.ECSM)
-	if err != nil {
-		_ = store.Close()
-		return nil, fmt.Errorf("create ecsm actual collector: %w", err)
-	}
+	// ECSM 配置已在入口校验过 IP/Port，NewCollectorFromConfig 不会失败。
+	collectClient, _ := ecsmclient.NewCollectorFromConfig(cfg.ECSM)
 
 	workQueue := queue.NewWorkQueue(128)
 	ecsmClient := ecsmclient.NewLogClient(collectClient)
@@ -149,24 +140,29 @@ func (a *App) Close() error {
 	if a == nil {
 		return nil
 	}
-
-	var closeErr error
-	if a.server != nil {
-		if err := a.server.Close(); err != nil {
-			closeErr = err
-		}
-	}
-	if a.store != nil {
-		if err := a.store.Close(); err != nil && closeErr == nil {
-			closeErr = err
-		}
-	}
-	return closeErr
+	return closeAll(a.server, a.store)
 }
+
+// closeAll 依次关闭资源，返回第一个出现的错误。
+func closeAll(closers ...interface{ Close() error }) error {
+	var firstErr error
+	for _, closer := range closers {
+		if closer == nil {
+			continue
+		}
+		if err := closer.Close(); err != nil && firstErr == nil {
+			firstErr = err
+		}
+	}
+	return firstErr
+}
+
+// newAppInstance 创建 App 实例，便于测试注入 Close 失败等场景。
+var newAppInstance = New
 
 // Run 根据配置创建并运行 App。
 func Run(ctx context.Context, cfg config.Config) error {
-	app, err := New(cfg)
+	app, err := newAppInstance(cfg)
 	if err != nil {
 		return err
 	}

@@ -36,3 +36,10 @@ func TestWorkQueueGetStopsWhenContextIsCancelled(t *testing.T) {
 		t.Fatalf("Get() = (%q, %t), want (empty, false)", got, ok)
 	}
 }
+
+func TestNewWorkQueueAppliesDefaultSize(t *testing.T) {
+	q := NewWorkQueue(0)
+	if cap(q.items) != 128 {
+		t.Fatalf("NewWorkQueue(0) capacity = %d, want default 128", cap(q.items))
+	}
+}

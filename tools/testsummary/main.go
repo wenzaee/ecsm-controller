@@ -39,26 +39,38 @@ type packageStats struct {
 	duration float64
 }
 
+// osExit 便于测试拦截进程退出。
+var osExit = os.Exit
+
 func main() {
-	input := flag.String("input", "", "path to go test -json output")
-	coverage := flag.String("coverage", "", "optional go tool cover -func output")
-	output := flag.String("output", "", "path for the Markdown report")
-	exitCode := flag.Int("exit-code", 0, "exit code returned by go test")
-	flag.Parse()
+	osExit(runCLI(os.Args[1:]))
+}
+
+// runCLI 执行测试摘要生成流程，返回进程退出码。
+func runCLI(args []string) int {
+	flags := flag.NewFlagSet("testsummary", flag.ContinueOnError)
+	input := flags.String("input", "", "path to go test -json output")
+	coverage := flags.String("coverage", "", "optional go tool cover -func output")
+	output := flags.String("output", "", "path for the Markdown report")
+	exitCode := flags.Int("exit-code", 0, "exit code returned by go test")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
 	if *input == "" || *output == "" {
 		fmt.Fprintln(os.Stderr, "usage: testsummary --input test-results.json [--coverage coverage.txt] --output test-summary.md")
-		os.Exit(2)
+		return 2
 	}
 
 	report, err := buildReport(*input, *coverage, *exitCode)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+		return 1
 	}
 	if err := os.WriteFile(*output, []byte(report), 0o644); err != nil {
 		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+		return 1
 	}
+	return 0
 }
 
 func buildReport(input, coverage string, exitCode int) (string, error) {
@@ -114,10 +126,7 @@ func buildReport(input, coverage string, exitCode int) (string, error) {
 	}
 	for _, list := range byAction {
 		sort.Slice(list, func(i, j int) bool {
-			if list[i].packageName == list[j].packageName {
-				return list[i].name < list[j].name
-			}
-			return list[i].packageName < list[j].packageName
+			return lessTestResult(list[i], list[j])
 		})
 	}
 
@@ -177,6 +186,14 @@ func buildReport(input, coverage string, exitCode int) (string, error) {
 	writeResults(&report, "跳过用例详情", byAction["skip"], false)
 	report.WriteString("\n可下载 **backend-test-report** 构件，查看原始 JSON 测试事件、此 Markdown 摘要和可交互的 HTML 覆盖率报告。\n")
 	return report.String(), nil
+}
+
+// lessTestResult 按代码包名和用例名排序测试结果。
+func lessTestResult(a, b *testResult) bool {
+	if a.packageName == b.packageName {
+		return a.name < b.name
+	}
+	return a.packageName < b.packageName
 }
 
 func summarizePackages(byAction map[string][]*testResult) []packageStats {

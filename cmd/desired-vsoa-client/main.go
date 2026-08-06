@@ -5,7 +5,9 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"io"
 	"log"
+	"os"
 	"strings"
 	"time"
 
@@ -14,37 +16,54 @@ import (
 	desiredvsoa "github.com/wenzaee/ecsm-controller/pkg/vsoa"
 )
 
+// osExit 便于测试拦截进程退出。
+var osExit = os.Exit
+
+// newClient 便于测试注入自定义 Desired State 客户端。
+var newClient = desiredclient.New
+
 func main() {
-	configPath := flag.String("config", "configs/demo.yaml", "YAML config file path")
-	addr := flag.String("addr", "192.168.50.82:13447", "VSOA server address")
-	password := flag.String("password", "", "VSOA password")
-	action := flag.String("action", "healthz", "action: healthz, update, query, delete, list")
-	serviceName := flag.String("service", "", "service name")
-	desiredAction := flag.String("desired-action", string(desiredclient.ActionStart), "desired action")
-	replicas := flag.Int("replicas", 1, "desired replicas")
-	payload := flag.String("payload", "", "raw JSON request payload")
-	timeout := flag.Duration("timeout", 5*time.Second, "request timeout")
-	flag.Parse()
+	osExit(runCLI(context.Background(), os.Args[1:], os.Stdout))
+}
+
+// runCLI 执行 desired state VSOA 客户端命令行流程，返回进程退出码。
+func runCLI(ctx context.Context, args []string, out io.Writer) int {
+	flags := flag.NewFlagSet("desired-vsoa-client", flag.ContinueOnError)
+	configPath := flags.String("config", "configs/demo.yaml", "YAML config file path")
+	addr := flags.String("addr", "192.168.50.82:13447", "VSOA server address")
+	password := flags.String("password", "", "VSOA password")
+	action := flags.String("action", "healthz", "action: healthz, update, query, delete, list")
+	serviceName := flags.String("service", "", "service name")
+	desiredAction := flags.String("desired-action", string(desiredclient.ActionStart), "desired action")
+	replicas := flags.Int("replicas", 1, "desired replicas")
+	payload := flags.String("payload", "", "raw JSON request payload")
+	timeout := flags.Duration("timeout", 5*time.Second, "request timeout")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
 
 	actionName := strings.ToLower(strings.TrimSpace(*action))
 	if !isSupportedAction(actionName) {
-		log.Fatalf("不支持的 action: %s", *action)
+		log.Printf("不支持的 action: %s", *action)
+		return 1
 	}
 
 	cfg, err := config.Load(*configPath)
 	if err != nil {
-		log.Fatalf("读取配置失败: %v", err)
+		log.Printf("读取配置失败: %v", err)
+		return 1
 	}
 
 	address := firstNonEmpty(*addr, cfg.VSOA.ListenAddr, ":18082")
 	pass := firstNonEmpty(*password, cfg.VSOA.Password)
 
-	c, err := desiredclient.New(desiredclient.Option{
+	c, err := newClient(desiredclient.Option{
 		Address:  address,
 		Password: pass,
 	})
 	if err != nil {
-		log.Fatalf("创建 VSOA client 失败: %v", err)
+		log.Printf("创建 VSOA client 失败: %v", err)
+		return 1
 	}
 	defer func() {
 		if err := c.Close(); err != nil {
@@ -52,31 +71,37 @@ func main() {
 		}
 	}()
 
-	ctx, cancel := context.WithTimeout(context.Background(), *timeout)
+	callCtx, cancel := context.WithTimeout(ctx, *timeout)
 	defer cancel()
 
 	var resp any
 	switch actionName {
 	case "healthz":
-		resp, err = c.Healthz(ctx)
+		resp, err = c.Healthz(callCtx)
 	case "update":
 		req, buildErr := buildUpdateRequest(*payload, *serviceName, *desiredAction, *replicas)
 		if buildErr != nil {
-			log.Fatalf("构造 update 请求失败: %v", buildErr)
+			log.Printf("构造 update 请求失败: %v", buildErr)
+			return 1
 		}
-		resp, err = c.UpdateDesiredRequest(ctx, req)
+		resp, err = c.UpdateDesiredRequest(callCtx, req)
 	case "query":
-		resp, err = c.QueryDesired(ctx, *serviceName)
+		resp, err = c.QueryDesired(callCtx, *serviceName)
 	case "delete":
-		resp, err = c.DeleteDesired(ctx, *serviceName)
+		resp, err = c.DeleteDesired(callCtx, *serviceName)
 	case "list":
-		resp, err = c.ListDesired(ctx)
+		resp, err = c.ListDesired(callCtx)
 	}
 	if err != nil {
-		log.Fatalf("调用 VSOA 失败: %v", err)
+		log.Printf("调用 VSOA 失败: %v", err)
+		return 1
 	}
 
-	printJSON(resp)
+	if err := printJSON(out, resp); err != nil {
+		log.Printf("JSON 编码失败: %v", err)
+		return 1
+	}
+	return 0
 }
 
 func buildUpdateRequest(rawPayload, serviceName, action string, replicas int) (desiredvsoa.UpdateDesiredRequest, error) {
@@ -104,12 +129,13 @@ func isSupportedAction(action string) bool {
 	}
 }
 
-func printJSON(value any) {
+func printJSON(out io.Writer, value any) error {
 	payload, err := json.MarshalIndent(value, "", "  ")
 	if err != nil {
-		log.Fatalf("JSON 编码失败: %v", err)
+		return err
 	}
-	fmt.Println(string(payload))
+	_, err = fmt.Fprintln(out, string(payload))
+	return err
 }
 
 func firstNonEmpty(values ...string) string {
