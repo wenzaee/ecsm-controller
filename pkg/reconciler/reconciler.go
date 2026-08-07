@@ -148,7 +148,7 @@ func CompareDesiredActual(desired *registry.DesiredState, actual ecsmclient.Serv
 			return DiffNone
 		}
 		if actualReplicas < desired.Replicas {
-			return DiffNeedScaleOut
+			return DiffNeedScaleIn
 		}
 		if actualReplicas > desired.Replicas {
 			return DiffNeedScaleIn
